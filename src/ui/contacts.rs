@@ -3,11 +3,19 @@ use gtk4::prelude::*;
 use gtk4::{
     ApplicationWindow, Box, Button, Label, ListBox, ListBoxRow, Orientation, ScrolledWindow,
 };
+use std::rc::Rc;
 
 use crate::models::Contact;
 use crate::ui::widgets;
 
-pub fn create_contacts_list(contacts: Vec<Contact>, window: &ApplicationWindow) -> Box {
+pub fn create_contacts_list<F>(
+    contacts: Vec<Contact>,
+    window: &ApplicationWindow,
+    on_select: F,
+) -> Box
+where
+    F: Fn(&Contact) + 'static,
+{
     let main_box = Box::new(Orientation::Vertical, 0);
 
     // Header
@@ -47,10 +55,22 @@ pub fn create_contacts_list(contacts: Vec<Contact>, window: &ApplicationWindow) 
     let list_box = ListBox::new();
     list_box.add_css_class("navigation-sidebar");
 
+    // Store contacts with their rows for the callback
+    let contacts_vec = Rc::new(contacts.clone());
+
     for contact in contacts {
         let row = create_contact_row(&contact);
         list_box.append(&row);
     }
+
+    // Connect to row activation signal on the list box
+    let on_select = Rc::new(on_select);
+    list_box.connect_row_activated(move |_, row| {
+        let index = row.index();
+        if let Some(contact) = contacts_vec.get(index as usize) {
+            on_select(contact);
+        }
+    });
 
     scrolled.set_child(Some(&list_box));
     main_box.append(&scrolled);

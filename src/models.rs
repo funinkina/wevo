@@ -7,6 +7,7 @@ pub struct Contact {
     pub last_message: String,
     pub time: String,
     pub avatar_color: String,
+    pub remote_jid: String,
 }
 
 // API Response structures
@@ -74,13 +75,14 @@ pub struct MessageContent {
 }
 
 impl Contact {
-    pub fn new(name: String, last_message: String, time: String) -> Self {
+    pub fn new(name: String, last_message: String, time: String, remote_jid: String) -> Self {
         let avatar_color = Self::generate_color(&name);
         Self {
             name,
             last_message,
             time,
             avatar_color,
+            remote_jid,
         }
     }
 
@@ -102,7 +104,7 @@ impl Contact {
 
         let time = Self::format_time(&chat.updated_at);
 
-        Self::new(name, last_message, time)
+        Self::new(name, last_message, time, chat.remote_jid.clone())
     }
 
     fn format_time(timestamp: &str) -> String {
@@ -150,6 +152,60 @@ impl Message {
             is_own,
         }
     }
+
+    pub fn from_api_message(msg: &ApiMessage) -> Self {
+        let content = msg
+            .message
+            .conversation
+            .clone()
+            .unwrap_or_else(|| "[No text content]".to_string());
+
+        let time = Self::format_timestamp(msg.message_timestamp);
+        let is_own = msg.key.from_me;
+
+        Self::new(content, time, is_own)
+    }
+
+    fn format_timestamp(timestamp: i64) -> String {
+        use chrono::{Local, TimeZone};
+        let dt = Local.timestamp_opt(timestamp, 0).unwrap();
+        dt.format("%I:%M %p").to_string()
+    }
+}
+
+// API Response for messages
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MessagesResponse {
+    pub messages: MessagesData,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MessagesData {
+    pub total: i32,
+    pub pages: i32,
+    #[serde(rename = "currentPage")]
+    pub current_page: i32,
+    pub records: Vec<ApiMessage>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ApiMessage {
+    pub id: String,
+    pub key: MessageKey,
+    #[serde(rename = "pushName")]
+    pub push_name: Option<String>,
+    #[serde(rename = "messageType")]
+    pub message_type: String,
+    pub message: MessageContent,
+    #[serde(rename = "messageTimestamp")]
+    pub message_timestamp: i64,
+    #[serde(rename = "instanceId")]
+    pub instance_id: String,
+    pub source: String,
+    #[serde(rename = "contextInfo")]
+    pub context_info: Option<serde_json::Value>,
+    #[serde(rename = "MessageUpdate")]
+    pub message_update: Vec<serde_json::Value>,
 }
 
 #[derive(Clone, Debug)]

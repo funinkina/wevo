@@ -49,15 +49,27 @@ fn build_ui(app: &Application) {
 
     // Get contacts from API (or sample data as fallback)
     let contacts = data::fetch_chats_or_fallback();
-    let messages = data::get_sample_messages();
 
-    // Left side - Contacts list
-    let contacts_box = ui::contacts::create_contacts_list(contacts.clone(), &win);
+    // Left side - Contacts list with callback to update conversation view
+    let paned_for_callback = paned.clone();
+    let contacts_box = ui::contacts::create_contacts_list(contacts.clone(), &win, move |contact| {
+        // Fetch messages for the selected contact
+        let messages = data::fetch_messages_or_fallback(&contact.remote_jid);
+
+        // Create new conversation view
+        let conversation_box = ui::conversation::create_conversation_view(contact, messages);
+
+        // Update the right side of the paned
+        paned_for_callback.set_end_child(Some(&conversation_box));
+    });
     paned.set_start_child(Some(&contacts_box));
 
-    // Right side - Conversation view (with first contact)
-    let conversation_box = ui::conversation::create_conversation_view(&contacts[0], messages);
-    paned.set_end_child(Some(&conversation_box));
+    // Right side - Empty initially or with first contact
+    if !contacts.is_empty() {
+        let messages = data::fetch_messages_or_fallback(&contacts[0].remote_jid);
+        let conversation_box = ui::conversation::create_conversation_view(&contacts[0], messages);
+        paned.set_end_child(Some(&conversation_box));
+    }
 
     win.set_child(Some(&paned));
     win.show();

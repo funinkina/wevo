@@ -49,6 +49,17 @@ pub fn create_conversation_view(contact: &Contact, messages: Vec<Message>) -> Bo
     }
 
     scrolled.set_child(Some(&messages_box));
+
+    // Scroll to bottom after the widget is realized
+    let scrolled_clone = scrolled.clone();
+    scrolled.connect_realize(move |_| {
+        // Use idle_add to ensure this happens after layout
+        let adj = scrolled_clone.vadjustment();
+        glib::idle_add_local_once(move || {
+            adj.set_value(adj.upper() - adj.page_size());
+        });
+    });
+
     main_box.append(&scrolled);
 
     // Input area
