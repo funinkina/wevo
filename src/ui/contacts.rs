@@ -86,8 +86,8 @@ fn create_contact_row(contact: &Contact) -> ListBoxRow {
     row.set_activatable(true);
 
     let main_row = Box::new(Orientation::Horizontal, 12);
-    main_row.set_margin_start(15);
-    main_row.set_margin_end(15);
+    main_row.set_margin_start(5);
+    main_row.set_margin_end(5);
     main_row.set_margin_top(10);
     main_row.set_margin_bottom(10);
 
@@ -110,6 +110,7 @@ fn create_contact_row(contact: &Contact) -> ListBoxRow {
     name.set_ellipsize(gtk4::pango::EllipsizeMode::End);
     name.set_max_width_chars(20); // Limit width to prevent overflow
     name.set_xalign(0.0); // Left align
+    name.set_lines(1); // Single line only
     name.add_css_class("heading");
     top_row.append(&name);
 
@@ -129,6 +130,8 @@ fn create_contact_row(contact: &Contact) -> ListBoxRow {
     last_msg.set_max_width_chars(30); // Limit width
     last_msg.set_xalign(0.0); // Left align
     last_msg.set_lines(1); // Single line only
+    last_msg.set_single_line_mode(true); // Force single line
+    last_msg.set_wrap(false); // Disable wrapping
     last_msg.add_css_class("dim-label");
     info_box.append(&last_msg);
 

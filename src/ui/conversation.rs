@@ -16,7 +16,7 @@ pub fn create_conversation_view(contact: &Contact, messages: Vec<Message>) -> Bo
     header.set_margin_bottom(10);
 
     // Avatar
-    let avatar = widgets::create_avatar(&contact.initials(), &contact.avatar_color, 48);
+    let avatar = widgets::create_avatar(&contact.initials(), &contact.avatar_color, 32);
     header.append(&avatar);
 
     // Contact name
@@ -100,10 +100,21 @@ fn create_message_bubble(message: &Message) -> Box {
     content.set_xalign(0.0);
     content.set_max_width_chars(50);
 
+    // Add padding around the message text
+    content.set_margin_start(10);
+    content.set_margin_end(10);
+    content.set_margin_top(10);
+    content.set_margin_bottom(10);
+
     let time = Label::new(Some(&message.time));
     time.add_css_class("caption");
     time.add_css_class("dim-label");
     time.set_xalign(0.0);
+    // Add padding around the time text
+    time.set_margin_start(10);
+    time.set_margin_end(10);
+    time.set_margin_top(0);
+    time.set_margin_bottom(5);
 
     bubble.append(&content);
     bubble.append(&time);
