@@ -47,6 +47,16 @@ fn build_ui(app: &Application) {
         .position(350)
         .build();
 
+    // Set minimum position for contacts pane (300px minimum width)
+    const MIN_CONTACTS_WIDTH: i32 = 300;
+    let paned_clone = paned.clone();
+    paned.connect_position_notify(move |_| {
+        let current_pos = paned_clone.position();
+        if current_pos < MIN_CONTACTS_WIDTH {
+            paned_clone.set_position(MIN_CONTACTS_WIDTH);
+        }
+    });
+
     // Get contacts from API (or sample data as fallback)
     let contacts = data::fetch_chats_or_fallback();
 

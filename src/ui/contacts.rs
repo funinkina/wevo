@@ -17,6 +17,9 @@ where
     F: Fn(&Contact) + 'static,
 {
     let main_box = Box::new(Orientation::Vertical, 0);
+    // Set reasonable size constraints
+    main_box.set_size_request(300, -1); // Minimum width of 300px
+    main_box.set_hexpand(false); // Don't expand horizontally
 
     // Header
     let header = Box::new(Orientation::Horizontal, 10);
@@ -88,13 +91,15 @@ fn create_contact_row(contact: &Contact) -> ListBoxRow {
     main_row.set_margin_top(10);
     main_row.set_margin_bottom(10);
 
-    // Avatar
+    // Avatar with fixed size to prevent it from being cut off
     let avatar = widgets::create_avatar(&contact.initials(), &contact.avatar_color, 40);
+    avatar.set_size_request(40, 40);
     main_row.append(&avatar);
 
-    // Contact info
+    // Contact info with overflow handling
     let info_box = Box::new(Orientation::Vertical, 5);
     info_box.set_hexpand(true);
+    info_box.set_overflow(gtk4::Overflow::Hidden); // Prevent overflow
 
     // Contact name and time
     let top_row = Box::new(Orientation::Horizontal, 10);
@@ -102,6 +107,9 @@ fn create_contact_row(contact: &Contact) -> ListBoxRow {
     let name = Label::new(Some(&contact.name));
     name.set_halign(gtk4::Align::Start);
     name.set_hexpand(true);
+    name.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    name.set_max_width_chars(20); // Limit width to prevent overflow
+    name.set_xalign(0.0); // Left align
     name.add_css_class("heading");
     top_row.append(&name);
 
@@ -109,14 +117,18 @@ fn create_contact_row(contact: &Contact) -> ListBoxRow {
     time.set_halign(gtk4::Align::End);
     time.add_css_class("dim-label");
     time.add_css_class("caption");
+    time.set_margin_start(5); // Ensure space between name and time
     top_row.append(&time);
 
     info_box.append(&top_row);
 
-    // Last message
+    // Last message with ellipsis
     let last_msg = Label::new(Some(&contact.last_message));
     last_msg.set_halign(gtk4::Align::Start);
     last_msg.set_ellipsize(gtk4::pango::EllipsizeMode::End);
+    last_msg.set_max_width_chars(30); // Limit width
+    last_msg.set_xalign(0.0); // Left align
+    last_msg.set_lines(1); // Single line only
     last_msg.add_css_class("dim-label");
     info_box.append(&last_msg);
 
