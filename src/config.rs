@@ -29,16 +29,6 @@ impl ConfigManager {
         Self::save_to_keyring(API_KEY_KEY, api_key)
     }
 
-    /// Delete the API URL from keyring
-    pub fn delete_url() -> Result<()> {
-        Self::delete_from_keyring(URL_KEY)
-    }
-
-    /// Delete the API key from keyring
-    pub fn delete_api_key() -> Result<()> {
-        Self::delete_from_keyring(API_KEY_KEY)
-    }
-
     // Private helper methods
     fn get_from_keyring(key: &str) -> Result<String> {
         let entry = Entry::new(SERVICE_NAME, key).context("Failed to create keyring entry")?;
@@ -52,12 +42,5 @@ impl ConfigManager {
         entry
             .set_password(value)
             .context("Failed to save to keyring")
-    }
-
-    fn delete_from_keyring(key: &str) -> Result<()> {
-        let entry = Entry::new(SERVICE_NAME, key).context("Failed to create keyring entry")?;
-        entry
-            .delete_password()
-            .context("Failed to delete from keyring")
     }
 }
