@@ -21,7 +21,12 @@ fn ensure_css_loaded() {
             ".message-sent {
                 background: @accent_bg_color;
                 color: @accent_fg_color;
-                border-radius: 12px;
+                border-radius: 16px;
+                border-top-right-radius: 4px;
+            }
+            .card {
+                border-radius: 16px;
+                border-top-left-radius: 4px;
             }",
         );
 
@@ -37,29 +42,46 @@ pub fn create_conversation_view(contact: &Contact, messages: Vec<Message>) -> Bo
     ensure_css_loaded();
 
     let main_box = Box::new(Orientation::Vertical, 0);
+    main_box.set_hexpand(true);
+    main_box.set_vexpand(true);
 
     // Header with contact name and avatar
     let header = Box::new(Orientation::Horizontal, 12);
-    header.set_margin_start(15);
-    header.set_margin_end(15);
-    header.set_margin_top(15);
-    header.set_margin_bottom(10);
+    header.set_margin_start(20);
+    header.set_margin_end(20);
+    header.set_margin_top(12);
+    header.set_margin_bottom(12);
+    header.add_css_class("toolbar");
 
     // Avatar - use profile picture if available, otherwise use initials
     let avatar = widgets::create_avatar_with_pic(
         contact.profile_pic_url.as_deref(),
         &contact.initials(),
         &contact.avatar_color,
-        32,
+        40,
     );
-    avatar.set_size_request(32, 32);
+    avatar.set_size_request(40, 40);
     header.append(&avatar);
+
+    // Contact info box
+    let info_box = Box::new(Orientation::Vertical, 2);
+    info_box.set_valign(gtk4::Align::Center);
+    info_box.set_hexpand(true);
 
     // Contact name
     let contact_name = Label::new(Some(&contact.name));
     contact_name.set_halign(gtk4::Align::Start);
-    contact_name.add_css_class("title-2");
-    header.append(&contact_name);
+    contact_name.add_css_class("title-3");
+    info_box.append(&contact_name);
+
+    // Status or additional info (optional)
+    let status = Label::new(Some("online"));
+    status.set_halign(gtk4::Align::Start);
+    status.add_css_class("caption");
+    status.add_css_class("dim-label");
+    info_box.append(&status);
+
+    header.append(&info_box);
 
     main_box.append(&header);
 
@@ -78,6 +100,7 @@ pub fn create_conversation_view(contact: &Contact, messages: Vec<Message>) -> Bo
     messages_box.set_margin_end(15);
     messages_box.set_margin_top(15);
     messages_box.set_margin_bottom(15);
+    // messages_box.add_css_class("view");
 
     for message in messages {
         let message_widget = create_message_bubble(&message);
@@ -98,20 +121,38 @@ pub fn create_conversation_view(contact: &Contact, messages: Vec<Message>) -> Bo
 
     main_box.append(&scrolled);
 
-    // Input area
-    let input_box = Box::new(Orientation::Horizontal, 10);
+    // Input area with modern styling
+    let input_container = Box::new(Orientation::Vertical, 0);
+
+    let input_separator = gtk4::Separator::new(Orientation::Horizontal);
+    input_container.append(&input_separator);
+
+    let input_box = Box::new(Orientation::Horizontal, 8);
     input_box.set_margin_start(15);
     input_box.set_margin_end(15);
-    input_box.set_margin_top(10);
-    input_box.set_margin_bottom(15);
+    input_box.set_margin_top(12);
+    input_box.set_margin_bottom(12);
+
+    // Attach button (emoji or file)
+    let attach_button = Button::from_icon_name("list-add-symbolic");
+    attach_button.add_css_class("flat");
+    attach_button.add_css_class("circular");
+    input_box.append(&attach_button);
+
+    // Emoji button
+    let emoji_button = Button::from_icon_name("face-smile-symbolic");
+    emoji_button.add_css_class("flat");
+    emoji_button.add_css_class("circular");
+    input_box.append(&emoji_button);
 
     let input_entry = Entry::builder()
         .placeholder_text("Type a message...")
         .hexpand(true)
         .build();
 
-    let send_button = Button::builder().label("Send").build();
+    let send_button = Button::from_icon_name("mail-send-symbolic");
     send_button.add_css_class("suggested-action");
+    send_button.add_css_class("circular");
 
     // Clone variables for closures
     let remote_jid = contact.remote_jid.clone();
@@ -197,41 +238,44 @@ pub fn create_conversation_view(contact: &Contact, messages: Vec<Message>) -> Bo
     input_box.append(&input_entry);
     input_box.append(&send_button);
 
-    main_box.append(&input_box);
+    input_container.append(&input_box);
+    main_box.append(&input_container);
 
     main_box
 }
 
 fn create_message_bubble(message: &Message) -> Box {
     let container = Box::new(Orientation::Horizontal, 0);
+    container.set_margin_start(10);
+    container.set_margin_end(10);
 
-    let bubble = Box::new(Orientation::Vertical, 5);
-    bubble.set_margin_start(10);
-    bubble.set_margin_end(10);
-    bubble.set_margin_top(5);
-    bubble.set_margin_bottom(5);
+    let bubble = Box::new(Orientation::Vertical, 4);
+    bubble.set_margin_start(8);
+    bubble.set_margin_end(8);
+    bubble.set_margin_top(4);
+    bubble.set_margin_bottom(4);
 
     let content = Label::new(Some(&message.content));
     content.set_wrap(true);
     content.set_wrap_mode(gtk4::pango::WrapMode::WordChar);
     content.set_xalign(0.0);
     content.set_max_width_chars(50);
+    content.set_selectable(true);
 
     // Add padding around the message text
-    content.set_margin_start(10);
-    content.set_margin_end(10);
-    content.set_margin_top(10);
-    content.set_margin_bottom(10);
+    content.set_margin_start(12);
+    content.set_margin_end(12);
+    content.set_margin_top(8);
+    content.set_margin_bottom(4);
 
     let time = Label::new(Some(&message.time));
     time.add_css_class("caption");
     time.add_css_class("dim-label");
-    time.set_xalign(0.0);
-    // Add padding around the time text
-    time.set_margin_start(10);
-    time.set_margin_end(10);
+    time.set_xalign(1.0); // Align time to the right
+    time.set_margin_start(12);
+    time.set_margin_end(12);
     time.set_margin_top(0);
-    time.set_margin_bottom(5);
+    time.set_margin_bottom(6);
 
     bubble.append(&content);
     bubble.append(&time);
@@ -242,7 +286,7 @@ fn create_message_bubble(message: &Message) -> Box {
         container.set_halign(gtk4::Align::End);
         container.append(&bubble);
     } else {
-        // Other messages - align left with default background
+        // Other messages - align left with card background
         bubble.add_css_class("card");
         container.set_halign(gtk4::Align::Start);
         container.append(&bubble);
