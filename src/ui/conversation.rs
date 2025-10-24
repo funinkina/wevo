@@ -8,7 +8,34 @@ use crate::data;
 use crate::models::{Contact, Message};
 use crate::ui::widgets;
 
+// Ensure CSS is loaded for message bubbles
+fn ensure_css_loaded() {
+    use gtk4::CssProvider;
+    use gtk4::gdk::Display;
+
+    static CSS_LOADED: std::sync::Once = std::sync::Once::new();
+
+    CSS_LOADED.call_once(|| {
+        let provider = CssProvider::new();
+        provider.load_from_data(
+            ".message-sent {
+                background: @accent_bg_color;
+                color: @accent_fg_color;
+                border-radius: 12px;
+            }",
+        );
+
+        gtk4::style_context_add_provider_for_display(
+            &Display::default().expect("Could not connect to a display."),
+            &provider,
+            gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+    });
+}
+
 pub fn create_conversation_view(contact: &Contact, messages: Vec<Message>) -> Box {
+    ensure_css_loaded();
+
     let main_box = Box::new(Orientation::Vertical, 0);
 
     // Header with contact name and avatar
@@ -210,9 +237,8 @@ fn create_message_bubble(message: &Message) -> Box {
     bubble.append(&time);
 
     if message.is_own {
-        // Own messages - align right with blue background
-        bubble.add_css_class("accent");
-        bubble.add_css_class("card");
+        // Own messages - align right with accent color background
+        bubble.add_css_class("message-sent");
         container.set_halign(gtk4::Align::End);
         container.append(&bubble);
     } else {
