@@ -16,9 +16,6 @@ where
     main_box.set_hexpand(false);
     main_box.add_css_class("sidebar");
 
-    // Add a subtle border on the right
-    main_box.add_css_class("view");
-
     // Contacts list
     let scrolled = ScrolledWindow::builder()
         .hscrollbar_policy(gtk4::PolicyType::Never)
