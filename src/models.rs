@@ -76,18 +76,6 @@ pub struct MessageContent {
 }
 
 impl Contact {
-    pub fn new(name: String, last_message: String, time: String, remote_jid: String) -> Self {
-        let avatar_color = Self::generate_color(&name);
-        Self {
-            name,
-            last_message,
-            time,
-            avatar_color,
-            remote_jid,
-            profile_pic_url: None,
-        }
-    }
-
     pub fn from_chat(chat: &Chat) -> Self {
         let name = chat
             .push_name

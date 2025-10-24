@@ -1,68 +1,8 @@
-// Placeholder data for the application
+// Data fetching from Evolution API
 use crate::config::ConfigManager;
 use crate::models::{Chat, Config, Contact, Instance, Message, MessagesResponse};
 use anyhow::Result;
 use serde_json::json;
-
-pub fn get_sample_contacts() -> Vec<Contact> {
-    vec![
-        Contact::new(
-            "Alice Johnson".to_string(),
-            "Hey! How are you doing?".to_string(),
-            "10:23 AM".to_string(),
-            "sample1@s.whatsapp.net".to_string(),
-        ),
-        Contact::new(
-            "Bob Smith".to_string(),
-            "Did you see the latest update?".to_string(),
-            "Yesterday".to_string(),
-            "sample2@s.whatsapp.net".to_string(),
-        ),
-        Contact::new(
-            "Charlie Brown".to_string(),
-            "Thanks for your help!".to_string(),
-            "Monday".to_string(),
-            "sample3@s.whatsapp.net".to_string(),
-        ),
-        Contact::new(
-            "Diana Prince".to_string(),
-            "Let's schedule a meeting".to_string(),
-            "Sunday".to_string(),
-            "sample4@s.whatsapp.net".to_string(),
-        ),
-        Contact::new(
-            "Eve Wilson".to_string(),
-            "Perfect! See you there.".to_string(),
-            "Oct 20".to_string(),
-            "sample5@s.whatsapp.net".to_string(),
-        ),
-    ]
-}
-
-pub fn get_sample_messages() -> Vec<Message> {
-    vec![
-        Message::new(
-            "Hey! How are you doing?".to_string(),
-            "10:20 AM".to_string(),
-            false,
-        ),
-        Message::new(
-            "I'm doing great! Thanks for asking.".to_string(),
-            "10:21 AM".to_string(),
-            true,
-        ),
-        Message::new(
-            "That's wonderful to hear! I wanted to ask you about the project we discussed last week.".to_string(),
-            "10:22 AM".to_string(),
-            false,
-        ),
-        Message::new(
-            "Sure! I've made some progress on it. What would you like to know?".to_string(),
-            "10:23 AM".to_string(),
-            true,
-        ),
-    ]
-}
 
 pub fn get_config() -> Config {
     // Try environment variables first, then fall back to keyring
@@ -101,20 +41,6 @@ pub fn fetch_chats() -> Result<Vec<Contact>> {
     Ok(contacts)
 }
 
-pub fn fetch_chats_or_fallback() -> Vec<Contact> {
-    match fetch_chats() {
-        Ok(contacts) if !contacts.is_empty() => contacts,
-        Ok(_) => {
-            eprintln!("No chats found, using sample data");
-            get_sample_contacts()
-        }
-        Err(e) => {
-            eprintln!("Failed to fetch chats: {}. Using sample data", e);
-            get_sample_contacts()
-        }
-    }
-}
-
 pub fn fetch_instance() -> Result<Instance> {
     let config = get_config();
 
@@ -150,7 +76,7 @@ pub fn fetch_instance_or_none() -> Option<String> {
             instance.profile_pic_url
         }
         Err(e) => {
-            eprintln!("Failed to fetch instance: {}. Using default profile", e);
+            eprintln!("Failed to fetch instance: {}", e);
             None
         }
     }
@@ -206,20 +132,6 @@ pub fn fetch_messages(remote_jid: &str) -> Result<Vec<Message>> {
     messages.reverse();
 
     Ok(messages)
-}
-
-pub fn fetch_messages_or_fallback(remote_jid: &str) -> Vec<Message> {
-    match fetch_messages(remote_jid) {
-        Ok(messages) if !messages.is_empty() => messages,
-        Ok(_) => {
-            eprintln!("No messages found, using sample data");
-            get_sample_messages()
-        }
-        Err(e) => {
-            eprintln!("Failed to fetch messages: {}. Using sample data", e);
-            get_sample_messages()
-        }
-    }
 }
 
 pub fn send_message(remote_jid: &str, text: &str) -> Result<()> {

@@ -21,6 +21,57 @@ fn main() {
     app.run();
 }
 
+fn show_connection_error(win: &adwaita::ApplicationWindow, error: &anyhow::Error) {
+    let error_box = GtkBox::new(Orientation::Vertical, 20);
+    error_box.set_valign(gtk4::Align::Center);
+    error_box.set_halign(gtk4::Align::Center);
+    error_box.set_margin_start(40);
+    error_box.set_margin_end(40);
+
+    // Error icon
+    let icon = gtk4::Image::from_icon_name("dialog-error-symbolic");
+    icon.set_pixel_size(64);
+    icon.add_css_class("error");
+    error_box.append(&icon);
+
+    // Error title
+    let title = Label::new(Some("Connection to Evolution API Failed"));
+    title.add_css_class("title-1");
+    error_box.append(&title);
+
+    // Error message
+    let message = Label::new(Some(&format!("Error: {}", error)));
+    message.add_css_class("dim-label");
+    message.set_wrap(true);
+    message.set_max_width_chars(60);
+    message.set_justify(gtk4::Justification::Center);
+    error_box.append(&message);
+
+    // Suggestion text
+    let suggestion = Label::new(Some(
+        "Please check your Evolution API configuration in Preferences",
+    ));
+    suggestion.add_css_class("caption");
+    suggestion.set_wrap(true);
+    suggestion.set_max_width_chars(60);
+    suggestion.set_justify(gtk4::Justification::Center);
+    error_box.append(&suggestion);
+
+    // Preferences button
+    let preferences_btn = gtk4::Button::with_label("Open Preferences");
+    preferences_btn.add_css_class("pill");
+    preferences_btn.add_css_class("suggested-action");
+    preferences_btn.set_halign(gtk4::Align::Center);
+
+    let win_clone = win.clone();
+    preferences_btn.connect_clicked(move |_| {
+        ui::preferences::show_preferences_dialog(&win_clone);
+    });
+    error_box.append(&preferences_btn);
+
+    win.set_content(Some(&error_box));
+}
+
 fn build_ui(app: &adwaita::Application) {
     let win = adwaita::ApplicationWindow::builder()
         .application(app)
@@ -28,8 +79,18 @@ fn build_ui(app: &adwaita::Application) {
         .default_height(800)
         .build();
 
-    // Get contacts from API (or sample data as fallback)
-    let contacts = data::fetch_chats_or_fallback();
+    // Try to get contacts from API
+    let contacts_result = data::fetch_chats();
+
+    // Check if we got an error connecting to Evolution API
+    if let Err(e) = contacts_result {
+        eprintln!("Failed to fetch chats: {}", e);
+        show_connection_error(&win, &e);
+        win.present();
+        return;
+    }
+
+    let contacts = contacts_result.unwrap();
 
     // Get user profile picture from instance API
     let user_profile_pic = data::fetch_instance_or_none();
@@ -107,7 +168,13 @@ fn build_ui(app: &adwaita::Application) {
         content_header.pack_end(&menu_button);
 
         // Fetch messages for the selected contact
-        let messages = data::fetch_messages_or_fallback(&contact.remote_jid);
+        let messages = match data::fetch_messages(&contact.remote_jid) {
+            Ok(msgs) => msgs,
+            Err(e) => {
+                eprintln!("Failed to fetch messages for {}: {}", contact.name, e);
+                Vec::new() // Empty message list on error
+            }
+        };
 
         // Create new conversation view
         let conversation_box = ui::conversation::create_conversation_view(contact, messages);
