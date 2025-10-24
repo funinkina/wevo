@@ -92,7 +92,12 @@ fn create_contact_row(contact: &Contact) -> ListBoxRow {
     main_row.set_margin_bottom(10);
 
     // Avatar with fixed size to prevent it from being cut off
-    let avatar = widgets::create_avatar(&contact.initials(), &contact.avatar_color, 40);
+    let avatar = widgets::create_avatar_with_pic(
+        contact.profile_pic_url.as_deref(),
+        &contact.initials(),
+        &contact.avatar_color,
+        40,
+    );
     avatar.set_size_request(40, 40);
     main_row.append(&avatar);
 

@@ -8,6 +8,7 @@ pub struct Contact {
     pub time: String,
     pub avatar_color: String,
     pub remote_jid: String,
+    pub profile_pic_url: Option<String>,
 }
 
 // API Response structures
@@ -83,6 +84,7 @@ impl Contact {
             time,
             avatar_color,
             remote_jid,
+            profile_pic_url: None,
         }
     }
 
@@ -103,8 +105,16 @@ impl Contact {
             .unwrap_or_else(|| "No messages".to_string());
 
         let time = Self::format_time(&chat.updated_at);
+        let avatar_color = Self::generate_color(&name);
 
-        Self::new(name, last_message, time, chat.remote_jid.clone())
+        Self {
+            name,
+            last_message,
+            time,
+            avatar_color,
+            remote_jid: chat.remote_jid.clone(),
+            profile_pic_url: chat.profile_pic_url.clone(),
+        }
     }
 
     fn format_time(timestamp: &str) -> String {

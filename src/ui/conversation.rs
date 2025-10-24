@@ -18,8 +18,14 @@ pub fn create_conversation_view(contact: &Contact, messages: Vec<Message>) -> Bo
     header.set_margin_top(15);
     header.set_margin_bottom(10);
 
-    // Avatar
-    let avatar = widgets::create_avatar(&contact.initials(), &contact.avatar_color, 32);
+    // Avatar - use profile picture if available, otherwise use initials
+    let avatar = widgets::create_avatar_with_pic(
+        contact.profile_pic_url.as_deref(),
+        &contact.initials(),
+        &contact.avatar_color,
+        32,
+    );
+    avatar.set_size_request(32, 32);
     header.append(&avatar);
 
     // Contact name
