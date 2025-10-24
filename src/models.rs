@@ -229,3 +229,24 @@ impl Config {
         Self { url, api_key }
     }
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Instance {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "connectionStatus")]
+    pub connection_status: String,
+    #[serde(rename = "ownerJid")]
+    pub owner_jid: String,
+    #[serde(rename = "profileName")]
+    pub profile_name: String,
+    #[serde(rename = "profilePicUrl")]
+    pub profile_pic_url: Option<String>,
+    pub integration: String,
+    pub number: Option<String>,
+    #[serde(rename = "businessId")]
+    pub business_id: Option<String>,
+    pub token: String,
+    #[serde(rename = "clientName")]
+    pub client_name: String,
+}

@@ -1,108 +1,84 @@
 // Preferences dialog for configuring URL and API key
 use crate::config::ConfigManager;
-use gtk4::prelude::*;
-use gtk4::{ApplicationWindow, Box, Button, Dialog, Entry, Label, Orientation, ResponseType};
+use adwaita::prelude::*;
+use gtk4::Button;
 
-pub fn show_preferences_dialog(parent: &ApplicationWindow) {
-    let dialog = Dialog::builder()
+pub fn show_preferences_dialog(parent: &adwaita::ApplicationWindow) {
+    let dialog = adwaita::PreferencesWindow::builder()
         .title("Preferences")
         .modal(true)
         .transient_for(parent)
-        .default_width(500)
-        .default_height(250)
         .build();
 
-    // Add buttons
-    dialog.add_button("Cancel", ResponseType::Cancel);
-    dialog.add_button("Save", ResponseType::Accept);
+    // Create a preferences page
+    let page = adwaita::PreferencesPage::builder()
+        .title("Connection")
+        .icon_name("network-wireless-symbolic")
+        .build();
 
-    // Create content area
-    let content_area = dialog.content_area();
-    let main_box = Box::new(Orientation::Vertical, 12);
-    main_box.set_margin_top(12);
-    main_box.set_margin_bottom(12);
-    main_box.set_margin_start(12);
-    main_box.set_margin_end(12);
+    // API Configuration Group
+    let api_group = adwaita::PreferencesGroup::builder()
+        .title("API Configuration")
+        .description("Configure Evolution API connection settings")
+        .build();
 
-    // API URL section
-    let url_label = Label::new(Some("API URL:"));
-    url_label.set_halign(gtk4::Align::Start);
-    main_box.append(&url_label);
+    // API URL row
+    let url_row = adwaita::EntryRow::builder()
+        .title("API URL")
+        .text(&ConfigManager::get_url())
+        .build();
+    url_row.add_suffix(&gtk4::Image::from_icon_name("network-server-symbolic"));
 
-    let url_entry = Entry::new();
-    url_entry.set_placeholder_text(Some("http://localhost:8080"));
-    url_entry.set_text(&ConfigManager::get_url());
-    main_box.append(&url_entry);
+    api_group.add(&url_row);
 
-    // Add some spacing
-    let spacer = Box::new(Orientation::Vertical, 0);
-    spacer.set_height_request(8);
-    main_box.append(&spacer);
+    // API Key row with visibility toggle
+    let key_row = adwaita::PasswordEntryRow::builder()
+        .title("API Key")
+        .text(&ConfigManager::get_api_key())
+        .build();
+    key_row.add_suffix(&gtk4::Image::from_icon_name("dialog-password-symbolic"));
 
-    // API Key section
-    let key_label = Label::new(Some("API Key:"));
-    key_label.set_halign(gtk4::Align::Start);
-    main_box.append(&key_label);
+    api_group.add(&key_row);
 
-    let key_entry = Entry::new();
-    key_entry.set_placeholder_text(Some("Enter your API key"));
-    key_entry.set_text(&ConfigManager::get_api_key());
-    key_entry.set_visibility(false); // Hide the API key text
-    main_box.append(&key_entry);
+    // Add action row for saving (optional, can also use dialog response)
+    let save_row = adwaita::ActionRow::builder()
+        .title("Save Settings")
+        .subtitle("Changes are saved automatically")
+        .build();
 
-    // Show/Hide API key toggle
-    let show_key_box = Box::new(Orientation::Horizontal, 6);
-    show_key_box.set_margin_top(4);
+    let save_button = Button::builder()
+        .label("Save")
+        .valign(gtk4::Align::Center)
+        .build();
+    save_button.add_css_class("suggested-action");
 
-    let show_key_button = Button::with_label("Show API Key");
-    show_key_button.set_halign(gtk4::Align::Start);
+    save_row.add_suffix(&save_button);
+    api_group.add(&save_row);
 
-    let key_entry_clone = key_entry.clone();
-    let show_key_button_clone = show_key_button.clone();
+    page.add(&api_group);
+    dialog.add(&page);
 
-    // Use a RefCell to track visibility state
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    let is_visible = Rc::new(RefCell::new(false));
-    let is_visible_clone = is_visible.clone();
+    // Handle save button click
+    let url_row_clone = url_row.clone();
+    let key_row_clone = key_row.clone();
+    let dialog_clone = dialog.clone();
 
-    show_key_button.connect_clicked(move |_| {
-        let mut visible = is_visible_clone.borrow_mut();
-        *visible = !*visible;
-        key_entry_clone.set_visibility(*visible);
-        if *visible {
-            show_key_button_clone.set_label("Hide API Key");
-        } else {
-            show_key_button_clone.set_label("Show API Key");
+    save_button.connect_clicked(move |_| {
+        let url = url_row_clone.text().to_string();
+        let api_key = key_row_clone.text().to_string();
+
+        // Save to keyring
+        if let Err(e) = ConfigManager::set_url(&url) {
+            eprintln!("Failed to save URL: {}", e);
         }
+
+        if let Err(e) = ConfigManager::set_api_key(&api_key) {
+            eprintln!("Failed to save API key: {}", e);
+        }
+
+        println!("Configuration saved successfully!");
+        dialog_clone.close();
     });
 
-    show_key_box.append(&show_key_button);
-    main_box.append(&show_key_box);
-
-    content_area.append(&main_box);
-
-    // Handle dialog response
-    let url_entry_clone = url_entry.clone();
-    let key_entry_clone = key_entry.clone();
-    dialog.connect_response(move |dialog, response| {
-        if response == ResponseType::Accept {
-            let url = url_entry_clone.text().to_string();
-            let api_key = key_entry_clone.text().to_string();
-
-            // Save to keyring
-            if let Err(e) = ConfigManager::set_url(&url) {
-                eprintln!("Failed to save URL: {}", e);
-            }
-
-            if let Err(e) = ConfigManager::set_api_key(&api_key) {
-                eprintln!("Failed to save API key: {}", e);
-            }
-
-            println!("Configuration saved successfully!");
-        }
-        dialog.close();
-    });
-
-    dialog.show();
+    dialog.present();
 }

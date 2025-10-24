@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 gtk4 = { version = "0.8", package = "gtk4" }
+adwaita = { version = "0.6", package = "libadwaita", features = ["v1_4"] }
 glib = "0.17"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }

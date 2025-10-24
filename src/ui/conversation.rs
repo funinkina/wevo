@@ -6,7 +6,6 @@ use std::sync::mpsc;
 
 use crate::data;
 use crate::models::{Contact, Message};
-use crate::ui::widgets;
 
 // Ensure CSS is loaded for message bubbles
 fn ensure_css_loaded() {
@@ -45,51 +44,7 @@ pub fn create_conversation_view(contact: &Contact, messages: Vec<Message>) -> Bo
     main_box.set_hexpand(true);
     main_box.set_vexpand(true);
 
-    // Header with contact name and avatar
-    let header = Box::new(Orientation::Horizontal, 12);
-    header.set_margin_start(20);
-    header.set_margin_end(20);
-    header.set_margin_top(12);
-    header.set_margin_bottom(12);
-    header.add_css_class("toolbar");
-
-    // Avatar - use profile picture if available, otherwise use initials
-    let avatar = widgets::create_avatar_with_pic(
-        contact.profile_pic_url.as_deref(),
-        &contact.initials(),
-        &contact.avatar_color,
-        40,
-    );
-    avatar.set_size_request(40, 40);
-    header.append(&avatar);
-
-    // Contact info box
-    let info_box = Box::new(Orientation::Vertical, 2);
-    info_box.set_valign(gtk4::Align::Center);
-    info_box.set_hexpand(true);
-
-    // Contact name
-    let contact_name = Label::new(Some(&contact.name));
-    contact_name.set_halign(gtk4::Align::Start);
-    contact_name.add_css_class("title-3");
-    info_box.append(&contact_name);
-
-    // Status or additional info (optional)
-    let status = Label::new(Some("online"));
-    status.set_halign(gtk4::Align::Start);
-    status.add_css_class("caption");
-    status.add_css_class("dim-label");
-    info_box.append(&status);
-
-    header.append(&info_box);
-
-    main_box.append(&header);
-
-    // Separator
-    let separator = gtk4::Separator::new(Orientation::Horizontal);
-    main_box.append(&separator);
-
-    // Messages area
+    // Messages area (header is now in the main window titlebar)
     let scrolled = ScrolledWindow::builder()
         .hscrollbar_policy(gtk4::PolicyType::Never)
         .vexpand(true)

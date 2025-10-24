@@ -19,25 +19,6 @@ where
     // Add a subtle border on the right
     main_box.add_css_class("view");
 
-    // Header with search or title
-    let header = Box::new(Orientation::Horizontal, 10);
-    header.set_margin_start(15);
-    header.set_margin_end(15);
-    header.set_margin_top(10);
-    header.set_margin_bottom(10);
-
-    let title = Label::new(Some("Chats"));
-    title.set_halign(gtk4::Align::Start);
-    title.set_hexpand(true);
-    title.add_css_class("title-2");
-    header.append(&title);
-
-    main_box.append(&header);
-
-    // Separator
-    let separator = gtk4::Separator::new(Orientation::Horizontal);
-    main_box.append(&separator);
-
     // Contacts list
     let scrolled = ScrolledWindow::builder()
         .hscrollbar_policy(gtk4::PolicyType::Never)
