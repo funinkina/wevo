@@ -1,7 +1,10 @@
 // Conversation view UI
+use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4::{Box, Button, Entry, Label, Orientation, ScrolledWindow};
+use std::sync::mpsc;
 
+use crate::data;
 use crate::models::{Contact, Message};
 use crate::ui::widgets;
 
@@ -76,6 +79,87 @@ pub fn create_conversation_view(contact: &Contact, messages: Vec<Message>) -> Bo
 
     let send_button = Button::builder().label("Send").build();
     send_button.add_css_class("suggested-action");
+
+    // Clone variables for closures
+    let remote_jid = contact.remote_jid.clone();
+    let messages_box_clone = messages_box.clone();
+    let scrolled_clone = scrolled.clone();
+    let input_entry_clone = input_entry.clone();
+
+    // Helper function to send message
+    let send_message_fn = move |text: String| {
+        if text.trim().is_empty() {
+            return;
+        }
+
+        let remote_jid_for_thread = remote_jid.clone();
+        let messages_box = messages_box_clone.clone();
+        let scrolled = scrolled_clone.clone();
+        let input_entry = input_entry_clone.clone();
+
+        // Create channel for communication between threads
+        let (sender, receiver) = mpsc::channel();
+
+        // Send message in a separate thread
+        std::thread::spawn(move || {
+            let result = data::send_message(&remote_jid_for_thread, &text);
+            let _ = sender.send((result, text));
+        });
+
+        // Poll for response on main thread using idle_add
+        glib::timeout_add_local(std::time::Duration::from_millis(100), move || {
+            if let Ok((result, text)) = receiver.try_recv() {
+                match result {
+                    Ok(_) => {
+                        // Add message to UI on success
+                        let now = chrono::Local::now();
+                        let time_str = now.format("%H:%M").to_string();
+                        let message = Message::new(text, time_str, true);
+
+                        let message_widget = create_message_bubble(&message);
+                        messages_box.append(&message_widget);
+
+                        // Clear input
+                        input_entry.set_text("");
+
+                        // Scroll to bottom
+                        let adj = scrolled.vadjustment();
+                        glib::idle_add_local_once(move || {
+                            adj.set_value(adj.upper() - adj.page_size());
+                        });
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to send message: {}", e);
+                        // TODO: Show error dialog to user
+                    }
+                }
+                glib::ControlFlow::Break
+            } else {
+                glib::ControlFlow::Continue
+            }
+        });
+    };
+
+    // Send button click handler
+    let send_message_fn_clone = send_message_fn.clone();
+    let input_entry_for_button = input_entry.clone();
+    send_button.connect_clicked(move |_| {
+        let text = input_entry_for_button.text().to_string();
+        send_message_fn_clone(text);
+    });
+
+    // Enter key handler for input entry
+    let input_entry_controller = gtk4::EventControllerKey::new();
+    let input_entry_for_key = input_entry.clone();
+    input_entry_controller.connect_key_pressed(move |_, key, _, _| {
+        if key == gtk4::gdk::Key::Return || key == gtk4::gdk::Key::KP_Enter {
+            let text = input_entry_for_key.text().to_string();
+            send_message_fn(text);
+            return gtk4::glib::Propagation::Stop;
+        }
+        gtk4::glib::Propagation::Proceed
+    });
+    input_entry.add_controller(input_entry_controller);
 
     input_box.append(&input_entry);
     input_box.append(&send_button);

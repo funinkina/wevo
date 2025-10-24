@@ -180,3 +180,36 @@ pub fn fetch_messages_or_fallback(remote_jid: &str) -> Vec<Message> {
         }
     }
 }
+
+pub fn send_message(remote_jid: &str, text: &str) -> Result<()> {
+    let config = get_config();
+
+    // Build the API endpoint
+    let url = format!("{}/message/sendText/main", config.url);
+
+    // Build the request body
+    let body = json!({
+        "number": remote_jid,
+        "text": text
+    });
+
+    // Make the API request
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .post(&url)
+        .header("apikey", &config.api_key)
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()?;
+
+    // Check if the response is successful
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_text = response
+            .text()
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        anyhow::bail!("API error ({}): {}", status, error_text);
+    }
+
+    Ok(())
+}
