@@ -74,13 +74,28 @@ fn build_ui(app: &Application) {
     });
     paned.set_start_child(Some(&contacts_box));
 
-    // Right side - Empty initially or with first contact
-    if !contacts.is_empty() {
-        let messages = data::fetch_messages_or_fallback(&contacts[0].remote_jid);
-        let conversation_box = ui::conversation::create_conversation_view(&contacts[0], messages);
-        paned.set_end_child(Some(&conversation_box));
-    }
+    // Right side - Generic pane with icon and text
+    let generic_pane = create_generic_pane();
+    paned.set_end_child(Some(&generic_pane));
 
     win.set_child(Some(&paned));
     win.show();
+}
+
+fn create_generic_pane() -> gtk4::Box {
+    let main_box = gtk4::Box::new(Orientation::Vertical, 10);
+    main_box.set_valign(gtk4::Align::Center);
+    main_box.set_halign(gtk4::Align::Center);
+
+    // Icon (using a chat icon, assuming it's available; adjust if needed)
+    let icon = gtk4::Image::from_icon_name("chat-bubbles-empty-symbolic");
+    icon.set_pixel_size(64);
+    main_box.append(&icon);
+
+    // Text label
+    let label = gtk4::Label::new(Some("Select a contact to start chatting"));
+    label.add_css_class("title-3");
+    main_box.append(&label);
+
+    main_box
 }
