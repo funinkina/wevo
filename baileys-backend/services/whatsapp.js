@@ -1,5 +1,7 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } from "@whiskeysockets/baileys"
 import P from "pino"
+import fs from "fs/promises"
+import path from "path"
 
 class WhatsAppService {
     constructor() {
@@ -14,6 +16,37 @@ class WhatsAppService {
         this.maxRetries = 5
         this.currentQr = null
         this.isAuthenticated = false
+    }
+
+    async clearAuthAndDatabase() {
+        console.log("Clearing auth folder and database...")
+
+        try {
+            // Clear auth folder
+            const authPath = "./auth"
+            const files = await fs.readdir(authPath)
+
+            for (const file of files) {
+                const filePath = path.join(authPath, file)
+                await fs.unlink(filePath)
+                console.log(`Deleted: ${filePath}`)
+            }
+
+            // Clear database
+            const dbPath = "./db/client.db"
+            try {
+                await fs.unlink(dbPath)
+                console.log(`Deleted: ${dbPath}`)
+            } catch (err) {
+                if (err.code !== 'ENOENT') {
+                    console.warn(`Could not delete database: ${err.message}`)
+                }
+            }
+
+            console.log("Auth and database cleared successfully")
+        } catch (error) {
+            console.error("Error clearing auth and database:", error)
+        }
     }
 
     async initialize() {
@@ -44,7 +77,7 @@ class WhatsAppService {
                 // Enable full history sync to get all past conversations
                 syncFullHistory: true,
                 // Emulate desktop browser to receive full chat history
-                browser: Browsers.macOS("Desktop"),
+                browser: Browsers.ubuntu("Linux"),
             })
 
             console.log("Socket created with syncFullHistory enabled")
@@ -104,7 +137,19 @@ class WhatsAppService {
                     const statusCode = lastDisconnect?.error?.output?.statusCode
                     const reason = lastDisconnect?.error?.output?.payload?.error || 'Unknown'
 
-                    console.log(`❌ Connection closed. Status: ${statusCode}, Reason: ${reason}`)
+                    console.log(`Connection closed. Status: ${statusCode}, Reason: ${reason}`)
+
+                    // Check if it's a 401 Unauthorized error
+                    if (statusCode === 401) {
+                        console.log("Unauthorized (401) - Clearing auth and database...")
+                        await this.clearAuthAndDatabase()
+                        console.log("Please scan QR code again.")
+                        this.retryCount = 0
+                        this.currentQr = null
+                        // Reinitialize to generate new QR
+                        setTimeout(() => this.initialize(), 1000)
+                        return
+                    }
 
                     const shouldReconnect = statusCode !== DisconnectReason.loggedOut
 
