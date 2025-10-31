@@ -1,0 +1,55 @@
+.message-sent {
+    background: @accent_bg_color;
+    color: @accent_fg_color;
+    border-radius: 12px;
+    max-width: 70%;
+}
+
+.message-received {
+    background: @window_bg_color;
+    border: 1px solid alpha(@borders, 0.5);
+    border-radius: 12px;
+    max-width: 70%;
+}
+
+.monospace {
+    font-family: monospace;
+    font-size: 0.7em;
+}
+
+.badge {
+    background: @accent_bg_color;
+    color: @accent_fg_color;
+    border-radius: 12px;
+    padding: 2px 6px;
+    font-size: 0.85em;
+    font-weight: bold;
+    min-width: 20px;
+    text-align: center;
+}
+
+.badge.accent {
+    background: @success_bg_color;
+    color: @success_fg_color;
+}
+
+/* Sidebar styling */
+.navigation-sidebar {
+    background: transparent;
+    border: none;
+}
+
+.navigation-sidebar row {
+    border: none;
+    border-radius: 0;
+    padding: 0;
+}
+
+.navigation-sidebar row:hover {
+    background: alpha(@accent_bg_color, 0.1);
+}
+
+.navigation-sidebar row:selected,
+.navigation-sidebar row:selected:hover {
+    background: alpha(@accent_bg_color, 0.15);
+}
