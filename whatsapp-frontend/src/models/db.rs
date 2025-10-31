@@ -61,7 +61,7 @@ impl Database {
     pub fn save_contact(&self, contact: &Contact) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         println!(
-            "💾 [DB] Attempting to save contact: {} ({})",
+            "[DB] Attempting to save contact: {} ({})",
             contact.name, contact.jid
         );
         conn.execute(
@@ -81,13 +81,13 @@ impl Database {
                 contact.profile_picture_url,
             ],
         )?;
-        println!("✅ [DB] Contact saved successfully");
+        println!("[DB] Contact saved successfully");
         Ok(())
     }
 
     pub fn get_contacts(&self) -> Result<Vec<Contact>> {
         let conn = self.conn.lock().unwrap();
-        println!("📖 [DB] Querying contacts from database...");
+        println!("[DB] Querying contacts from database...");
         let mut stmt = conn.prepare(
             "SELECT jid, name, last_message, last_message_time, unread_count, conversation_timestamp, is_group, archived, pinned, mute_end_time, profile_picture_url
              FROM contacts 
@@ -112,7 +112,7 @@ impl Database {
             })?
             .collect::<Result<Vec<_>>>()?;
 
-        println!("✅ [DB] Retrieved {} contacts", contacts.len());
+        println!("[DB] Retrieved {} contacts", contacts.len());
         Ok(contacts)
     }
 
@@ -134,6 +134,7 @@ impl Database {
 
     pub fn get_messages(&self, jid: &str) -> Result<Vec<Message>> {
         let conn = self.conn.lock().unwrap();
+        println!("[DB] Querying messages for JID: {}", jid);
         let mut stmt = conn.prepare(
             "SELECT id, jid, sender, content, timestamp, is_from_me 
              FROM messages 
@@ -154,6 +155,11 @@ impl Database {
             })?
             .collect::<Result<Vec<_>>>()?;
 
+        println!(
+            "[DB] Retrieved {} messages for JID: {}",
+            messages.len(),
+            jid
+        );
         Ok(messages)
     }
 

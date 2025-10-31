@@ -45,6 +45,7 @@ pub struct MainView {
     messages_scrolled: ScrolledWindow,
     message_entry: Entry,
     send_button: Button,
+    chat_title: adw::WindowTitle,
     current_contact: Arc<Mutex<Option<String>>>,
     db: Arc<Database>,
     #[allow(dead_code)]
@@ -164,22 +165,62 @@ impl MainView {
 
         let main_view = Self {
             widget: split_view,
-            contacts_list,
-            messages_box,
-            messages_scrolled,
+            contacts_list: contacts_list.clone(),
+            messages_box: messages_box.clone(),
+            messages_scrolled: messages_scrolled.clone(),
             message_entry: message_entry.clone(),
             send_button: send_button.clone(),
+            chat_title: chat_title.clone(),
             current_contact: Arc::new(Mutex::new(None)),
-            db,
+            db: Arc::clone(&db),
             api,
         };
 
-        // Connect signals
+        // Connect signals - clone everything we need before moving
         let current_contact_clone = Arc::clone(&main_view.current_contact);
+        let send_button_clone = send_button.clone();
         message_entry.connect_changed(move |entry| {
             let has_text = !entry.text().is_empty();
             let has_contact = current_contact_clone.lock().unwrap().is_some();
-            send_button.set_sensitive(has_text && has_contact);
+            send_button_clone.set_sensitive(has_text && has_contact);
+        });
+
+        // Connect row activation handler once
+        let messages_box_clone = messages_box.clone();
+        let messages_scrolled_clone = messages_scrolled.clone();
+        let db_clone = Arc::clone(&db);
+        let current_contact_clone2 = Arc::clone(&main_view.current_contact);
+        let message_entry_clone = main_view.message_entry.clone();
+        let send_button_clone2 = main_view.send_button.clone();
+        let chat_title_clone = main_view.chat_title.clone();
+
+        contacts_list.connect_row_activated(move |_, row| {
+            // Get the JID from the row's widget name
+            let jid = row.widget_name();
+            println!("[MainView] Row activated, JID: {}", jid);
+
+            if !jid.is_empty() {
+                // Update the chat title to show the contact name
+                let display_name = if jid.contains("@g.us") {
+                    // It's a group - extract name from JID
+                    jid.split('@').next().unwrap_or(&jid).to_string()
+                } else {
+                    // It's an individual contact - extract phone number
+                    jid.split('@').next().unwrap_or(&jid).to_string()
+                };
+                chat_title_clone.set_title(&display_name);
+
+                *current_contact_clone2.lock().unwrap() = Some(jid.to_string());
+                Self::load_messages_static(
+                    &messages_box_clone,
+                    &messages_scrolled_clone,
+                    &db_clone,
+                    &jid,
+                );
+                send_button_clone2.set_sensitive(!message_entry_clone.text().is_empty());
+            } else {
+                println!("[MainView] Warning: Row has no JID set!");
+            }
         });
 
         main_view
@@ -203,9 +244,6 @@ impl MainView {
         }
         println!("[MainView] Cleared existing contacts from list");
 
-        // Store contact JIDs in order
-        let contact_jids: Vec<String> = contacts.iter().map(|c| c.jid.clone()).collect();
-
         for contact in contacts {
             let contact_row = ContactRow::new(&contact);
 
@@ -214,28 +252,11 @@ impl MainView {
             row.set_child(Some(&contact_row.widget));
             row.set_activatable(true);
 
+            // Store the JID in the row's name so we can retrieve it later
+            row.set_widget_name(&contact.jid);
+
             self.contacts_list.append(&row);
         }
-
-        // Connect to row activation instead of button clicks
-        let messages_box = self.messages_box.clone();
-        let messages_scrolled = self.messages_scrolled.clone();
-        let db = Arc::clone(&self.db);
-        let current_contact = Arc::clone(&self.current_contact);
-        let message_entry = self.message_entry.clone();
-        let send_button = self.send_button.clone();
-
-        self.contacts_list.connect_row_activated(move |_, row| {
-            // Get the row index
-            let index = row.index();
-            if index >= 0 {
-                if let Some(jid) = contact_jids.get(index as usize) {
-                    *current_contact.lock().unwrap() = Some(jid.clone());
-                    Self::load_messages_static(&messages_box, &messages_scrolled, &db, jid);
-                    send_button.set_sensitive(!message_entry.text().is_empty());
-                }
-            }
-        });
 
         println!("[MainView] Finished updating contacts list");
     }
@@ -245,16 +266,25 @@ impl MainView {
         db: &Database,
         jid: &str,
     ) {
+        println!("[MainView] load_messages_static called for JID: {}", jid);
+
         // Clear existing messages
         while let Some(child) = messages_box.first_child() {
             messages_box.remove(&child);
         }
+        println!("[MainView] Cleared existing messages");
 
         // Load and display messages
-        if let Ok(messages) = db.get_messages(jid) {
-            for msg in messages {
-                let row = MessageRow::new(&msg.content, msg.is_from_me, msg.timestamp);
-                messages_box.append(&row.widget);
+        match db.get_messages(jid) {
+            Ok(messages) => {
+                println!("[MainView] Loaded {} messages for {}", messages.len(), jid);
+                for msg in messages {
+                    let row = MessageRow::new(&msg.content, msg.is_from_me, msg.timestamp);
+                    messages_box.append(&row.widget);
+                }
+            }
+            Err(e) => {
+                println!("[MainView] Error loading messages for {}: {}", jid, e);
             }
         }
 
