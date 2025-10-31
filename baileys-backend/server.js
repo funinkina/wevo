@@ -11,25 +11,9 @@ app.use(express.json())
 // Initialize WebSocket manager
 const wsManager = new WebSocketManager(wss)
 
-// Setup WhatsApp service callbacks
-whatsappService.onQr((qr) => {
-    console.log("QR Code received")
-    wsManager.sendQr(qr)
-})
-
-whatsappService.onConnection(() => {
-    console.log("Connected to WhatsApp")
-    wsManager.sendConnected()
-})
-
-whatsappService.onMessage((msg) => {
-    console.log("Message received:", msg.key.remoteJid)
-    wsManager.sendMessage(msg)
-})
-
-whatsappService.onContacts((contacts) => {
-    console.log("Contacts fetched:", contacts.length)
-    wsManager.sendContacts(contacts)
+// Setup WhatsApp service to forward all events to WebSocket
+whatsappService.onEvent((type, payload) => {
+    wsManager.sendEvent(type, payload)
 })
 
 // Setup routes
@@ -91,21 +75,12 @@ app.post("/auth/request-qr", async (req, res) => {
     }
 })
 
-// Fetch contacts endpoint
+// Fetch contacts endpoint - DEPRECATED, use WebSocket events
 app.get("/contacts", async (req, res) => {
-    try {
-        const contacts = await whatsappService.fetchContacts()
-        res.json({
-            success: true,
-            contacts,
-            count: contacts.length
-        })
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            error: error.message
-        })
-    }
+    res.status(404).json({
+        success: false,
+        message: "This endpoint is deprecated. Contacts are sent via WebSocket events."
+    })
 })
 
 // Fetch profile picture endpoint

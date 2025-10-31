@@ -11,8 +11,9 @@
   "dependencies": {
     "@whiskeysockets/baileys": "^6.6.0",
     "express": "^4.19.2",
-    "ws": "^8.17.0",
-    "pino": "^8.15.0"
+    "pino": "^8.15.0",
+    "qrcode": "^1.5.4",
+    "ws": "^8.17.0"
   },
   "type": "module"
 }

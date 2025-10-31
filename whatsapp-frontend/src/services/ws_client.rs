@@ -4,18 +4,15 @@ use std::thread;
 use tungstenite::{Message as WsMessage, connect};
 use url::Url;
 
+use super::events::{self, ConnectionUpdate};
+
 #[derive(Debug, Clone)]
 pub enum WhatsAppEvent {
     QrCode(String),
     Connected,
-    Message {
-        jid: String,
-        sender: String,
-        content: String,
-        timestamp: i64,
-        is_from_me: bool,
-    },
-    ContactsUpdate(Vec<crate::models::Contact>),
+    Message(events::WAMessage),
+    Contact(events::WAContact),
+    Chat(events::WAChat),
 }
 
 pub struct WebSocketClient {
@@ -69,90 +66,88 @@ impl WebSocketClient {
         tx: &mpsc::Sender<WhatsAppEvent>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let parsed: Value = serde_json::from_str(text)?;
+        let event_type = parsed["type"].as_str();
+        let payload = &parsed["payload"];
 
-        println!("WebSocket message type: {:?}", parsed["type"].as_str());
+        println!("WebSocket event type: {:?}", event_type);
 
-        match parsed["type"].as_str() {
-            Some("qr") => {
-                if let Some(qr) = parsed["qr"].as_str() {
-                    println!("Received QR code");
-                    tx.send(WhatsAppEvent::QrCode(qr.to_string()))?;
+        match event_type {
+            Some("connection.update") => {
+                let update: ConnectionUpdate = serde_json::from_value(payload.clone())?;
+                if let Some(qr) = update.qr {
+                    tx.send(WhatsAppEvent::QrCode(qr))?;
+                }
+                if let Some(conn_status) = update.connection {
+                    if conn_status == "open" {
+                        tx.send(WhatsAppEvent::Connected)?;
+                    }
                 }
             }
-            Some("connected") => {
-                println!("Received connected event");
-                tx.send(WhatsAppEvent::Connected)?;
+            Some("messages.upsert") => {
+                if let Ok(data) = serde_json::from_value::<events::EventPayload>(payload.clone()) {
+                    if let events::EventPayload::MessagesUpsert { messages } = data {
+                        for msg in messages {
+                            tx.send(WhatsAppEvent::Message(msg))?;
+                        }
+                    }
+                }
             }
-            Some("message") => {
-                let msg = &parsed["message"];
-                let key = &msg["key"];
-                let jid = key["remoteJid"].as_str().unwrap_or("").to_string();
-                let is_from_me = key["fromMe"].as_bool().unwrap_or(false);
-
-                // Extract message content
-                let content = if let Some(conversation) = msg["message"]["conversation"].as_str() {
-                    conversation.to_string()
-                } else if let Some(text) = msg["message"]["extendedTextMessage"]["text"].as_str() {
-                    text.to_string()
-                } else {
-                    "[Media]".to_string()
-                };
-
-                let timestamp = msg["messageTimestamp"].as_i64().unwrap_or(0);
-                let sender = if is_from_me {
-                    "me".to_string()
-                } else {
-                    key["participant"].as_str().unwrap_or(&jid).to_string()
-                };
-
-                println!("Received message from: {}", jid);
-
-                tx.send(WhatsAppEvent::Message {
-                    jid,
-                    sender,
-                    content,
-                    timestamp,
-                    is_from_me,
-                })?;
+            Some("chats.set") => {
+                if let Ok(data) = serde_json::from_value::<events::EventPayload>(payload.clone()) {
+                    if let events::EventPayload::ChatsSet { chats } = data {
+                        for chat in chats {
+                            tx.send(WhatsAppEvent::Chat(chat))?;
+                        }
+                    }
+                }
             }
-            Some("contacts") => {
-                println!("Received contacts event");
-                if let Some(contacts_array) = parsed["contacts"].as_array() {
-                    println!("Contacts array length: {}", contacts_array.len());
+            Some("chats.update") => {
+                if let Ok(data) = serde_json::from_value::<events::EventPayload>(payload.clone()) {
+                    if let events::EventPayload::ChatsUpdate(chats) = data {
+                        for chat in chats {
+                            tx.send(WhatsAppEvent::Chat(chat))?;
+                        }
+                    }
+                }
+            }
+            Some("contacts.set") => {
+                if let Ok(data) = serde_json::from_value::<events::EventPayload>(payload.clone()) {
+                    if let events::EventPayload::ContactsSet { contacts } = data {
+                        for contact in contacts {
+                            tx.send(WhatsAppEvent::Contact(contact))?;
+                        }
+                    }
+                }
+            }
+            Some("messaging-history.set") => {
+                if let Ok(data) = serde_json::from_value::<events::EventPayload>(payload.clone()) {
+                    if let events::EventPayload::MessagingHistorySet(history) = data {
+                        println!(
+                            "📚 Received messaging history: {} chats, {} contacts, {} messages",
+                            history.chats.len(),
+                            history.contacts.len(),
+                            history.messages.len()
+                        );
 
-                    let contacts: Vec<crate::models::Contact> = contacts_array
-                        .iter()
-                        .filter_map(|c| {
-                            let contact = crate::models::Contact {
-                                jid: c["jid"].as_str()?.to_string(),
-                                name: c["name"].as_str()?.to_string(),
-                                last_message: None,
-                                last_message_time: None,
-                                unread_count: c["unreadCount"].as_i64().unwrap_or(0) as i32,
-                                conversation_timestamp: c["conversationTimestamp"]
-                                    .as_i64()
-                                    .unwrap_or(0),
-                                is_group: c["isGroup"].as_bool().unwrap_or(false),
-                                archived: c["archived"].as_bool().unwrap_or(false),
-                                pinned: c["pinned"].as_i64().unwrap_or(0),
-                                mute_end_time: c["muteEndTime"].as_i64().unwrap_or(0),
-                                profile_picture_url: c["profilePictureUrl"]
-                                    .as_str()
-                                    .map(|s| s.to_string()),
-                            };
-                            println!("  - Contact: {} ({})", contact.name, contact.jid);
-                            Some(contact)
-                        })
-                        .collect();
+                        // Send all chats
+                        for chat in history.chats {
+                            tx.send(WhatsAppEvent::Chat(chat))?;
+                        }
 
-                    println!("Parsed {} contacts successfully", contacts.len());
-                    tx.send(WhatsAppEvent::ContactsUpdate(contacts))?;
-                } else {
-                    println!("Contacts field is not an array");
+                        // Send all contacts
+                        for contact in history.contacts {
+                            tx.send(WhatsAppEvent::Contact(contact))?;
+                        }
+
+                        // Send all messages
+                        for msg in history.messages {
+                            tx.send(WhatsAppEvent::Message(msg))?;
+                        }
+                    }
                 }
             }
             Some(other) => {
-                println!("Unknown message type: {}", other);
+                println!("Unhandled event type: {}", other);
             }
             None => {
                 println!("Message without type field");

@@ -2092,6 +2092,9 @@ dependencies = [
 name = "whatsapp-frontend"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "gdk-pixbuf",
+ "gio",
  "glib 0.17.10",
  "gtk4",
  "libadwaita",

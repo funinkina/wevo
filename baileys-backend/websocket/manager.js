@@ -6,7 +6,7 @@ class WebSocketManager {
 
     setupConnectionHandler() {
         this.wss.on('connection', (ws) => {
-            console.log('📱 Frontend connected to WebSocket')
+            console.log('Frontend connected to WebSocket')
 
             // When a new client connects, send them a welcome message
             ws.send(JSON.stringify({
@@ -25,35 +25,13 @@ class WebSocketManager {
                 sentCount++
             }
         }
-        if (sentCount > 0) {
-            console.log(`📤 Broadcasted to ${sentCount} client(s)`)
+        if (sentCount > 0 && data.type !== 'presence.update') { // Avoid logging presence spam
+            console.log(`Broadcasted event '${data.type}' to ${sentCount} client(s)`)
         }
     }
 
-    sendQr(qr) {
-        console.log('📱 Sending QR code to frontend')
-        this.broadcast({ type: "qr", qr })
-    }
-
-    sendConnected() {
-        console.log('✅ Sending connected status to frontend')
-        this.broadcast({ type: "connected" })
-    }
-
-    sendMessage(message) {
-        this.broadcast({ type: "message", message })
-    }
-
-    sendContacts(contacts) {
-        console.log(`📇 [WebSocketManager] Sending ${contacts.length} contacts to frontend`)
-        if (contacts.length > 0) {
-            console.log(`📇 Sample contacts being sent:`, JSON.stringify(contacts.slice(0, 3).map(c => ({
-                jid: c.jid,
-                name: c.name,
-                isGroup: c.isGroup
-            })), null, 2))
-        }
-        this.broadcast({ type: "contacts", contacts })
+    sendEvent(type, payload) {
+        this.broadcast({ type, payload })
     }
 }
 

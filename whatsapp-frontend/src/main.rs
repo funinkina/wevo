@@ -48,12 +48,14 @@ fn main() {
             // Show main view
             let main_view = MainView::new(Arc::clone(&db), Arc::clone(&api));
 
-            // Load contacts from database
+            // Load contacts from database first
             main_view.load_contacts();
 
-            // Setup WebSocket for receiving messages
+            let main_view_arc = Arc::new(main_view);
+
+            // Setup WebSocket for receiving messages and contacts
             let (_ws, rx) = WebSocketClient::new("ws://localhost:8787");
-            let main_view_clone = Arc::new(main_view);
+            let main_view_clone = Arc::clone(&main_view_arc);
             let db_clone = Arc::clone(&db);
 
             // Handle incoming WebSocket events
@@ -62,45 +64,92 @@ fn main() {
                 move || {
                     while let Ok(event) = rx.try_recv() {
                         match event {
-                            WhatsAppEvent::Message {
-                                jid,
-                                sender,
-                                content,
-                                timestamp,
-                                is_from_me,
-                            } => {
-                                println!("📨 [main.rs] Received message event for: {}", jid);
-                                main_view
-                                    .add_message(&jid, &sender, &content, timestamp, is_from_me);
-                            }
-                            WhatsAppEvent::ContactsUpdate(contacts) => {
+                            WhatsAppEvent::Message(msg) => {
                                 println!(
-                                    "👥 [main.rs] Received ContactsUpdate with {} contacts",
-                                    contacts.len()
+                                    "📨 [main.rs] Received message event for: {}",
+                                    msg.key.jid
                                 );
-                                for contact in &contacts {
-                                    println!(
-                                        "  - Saving contact: {} ({})",
-                                        contact.name, contact.jid
-                                    );
-                                    match db_clone.save_contact(&contact) {
-                                        Ok(_) => println!("    ✅ Saved successfully"),
-                                        Err(e) => eprintln!("    ❌ Failed to save: {}", e),
-                                    }
+                                // TODO: Save message to database and update UI
+                            }
+                            WhatsAppEvent::Contact(wa_contact) => {
+                                println!(
+                                    "👥 [main.rs] Received Contact: {} ({})",
+                                    wa_contact.name.as_ref().unwrap_or(&wa_contact.id),
+                                    wa_contact.id
+                                );
+
+                                // Convert WAContact to Contact model
+                                let contact = models::Contact {
+                                    jid: wa_contact.id.clone(),
+                                    name: wa_contact.name.or(wa_contact.notify).unwrap_or_else(
+                                        || {
+                                            wa_contact
+                                                .id
+                                                .split('@')
+                                                .next()
+                                                .unwrap_or(&wa_contact.id)
+                                                .to_string()
+                                        },
+                                    ),
+                                    last_message: None,
+                                    last_message_time: None,
+                                    unread_count: 0,
+                                    conversation_timestamp: 0,
+                                    is_group: wa_contact.id.contains("@g.us"),
+                                    archived: false,
+                                    pinned: 0,
+                                    mute_end_time: 0,
+                                    profile_picture_url: None,
+                                };
+
+                                // Save to database
+                                if let Err(e) = db_clone.save_contact(&contact) {
+                                    eprintln!("Failed to save contact {}: {}", contact.jid, e);
+                                } else {
+                                    println!("✅ Saved contact: {}", contact.name);
                                 }
-                                match db_clone.get_contacts() {
-                                    Ok(saved_contacts) => {
-                                        println!(
-                                            "👥 [main.rs] Retrieved {} contacts from DB",
-                                            saved_contacts.len()
-                                        );
-                                        main_view.update_contacts(saved_contacts);
-                                    }
-                                    Err(e) => {
-                                        eprintln!(
-                                            "❌ [main.rs] Failed to get contacts from DB: {}",
-                                            e
-                                        );
+                            }
+                            WhatsAppEvent::Chat(wa_chat) => {
+                                println!(
+                                    "💬 [main.rs] Received Chat: {} ({})",
+                                    wa_chat.name.as_ref().unwrap_or(&wa_chat.id),
+                                    wa_chat.id
+                                );
+
+                                // Convert WAChat to Contact model
+                                let contact = models::Contact {
+                                    jid: wa_chat.id.clone(),
+                                    name: wa_chat.name.unwrap_or_else(|| {
+                                        wa_chat
+                                            .id
+                                            .split('@')
+                                            .next()
+                                            .unwrap_or(&wa_chat.id)
+                                            .to_string()
+                                    }),
+                                    last_message: None,
+                                    last_message_time: None,
+                                    unread_count: wa_chat.unread_count.unwrap_or(0),
+                                    conversation_timestamp: wa_chat
+                                        .conversation_timestamp
+                                        .unwrap_or(0)
+                                        as i64,
+                                    is_group: wa_chat.id.contains("@g.us"),
+                                    archived: wa_chat.archived.unwrap_or(false),
+                                    pinned: wa_chat.pinned.unwrap_or(0),
+                                    mute_end_time: wa_chat.mute_end_time.unwrap_or(0),
+                                    profile_picture_url: None,
+                                };
+
+                                // Save to database
+                                if let Err(e) = db_clone.save_contact(&contact) {
+                                    eprintln!("Failed to save chat {}: {}", contact.jid, e);
+                                } else {
+                                    println!("✅ Saved chat: {}", contact.name);
+
+                                    // Update UI with the new/updated contact
+                                    if let Ok(contacts) = db_clone.get_contacts() {
+                                        main_view.update_contacts(contacts);
                                     }
                                 }
                             }
@@ -112,9 +161,9 @@ fn main() {
             });
 
             // Setup send message handler
-            main_view_clone.setup_send_handler({
+            main_view_arc.setup_send_handler({
                 let api = Arc::clone(&api);
-                let main_view = Arc::clone(&main_view_clone);
+                let main_view = Arc::clone(&main_view_arc);
                 move |jid, text| {
                     if let Err(e) = api.send_message(&jid, &text) {
                         eprintln!("Failed to send message: {}", e);
@@ -129,7 +178,7 @@ fn main() {
                 }
             });
 
-            window.set_content(Some(&main_view_clone.widget));
+            window.set_content(Some(&main_view_arc.widget));
         } else {
             // Show QR view
             let qr_view = Arc::new(QrView::new());
@@ -155,29 +204,127 @@ fn main() {
                 while let Ok(event) = rx.try_recv() {
                     match event {
                         WhatsAppEvent::QrCode(qr) => {
-                            println!("✅ QR Code received from backend");
+                            println!("QR Code received from backend");
                             qr_view_clone.show_qr(&qr);
                         }
                         WhatsAppEvent::Connected => {
-                            println!("✅ Connected to WhatsApp");
+                            println!("✅ Connected to WhatsApp!");
                             qr_view_clone.show_connecting();
 
                             // Mark as authenticated
                             let _ = db_clone.set_authenticated(true);
 
-                            // Transition to main view
-                            let main_view =
-                                MainView::new(Arc::clone(&db_clone), Arc::clone(&api_clone));
-
-                            // Try to fetch contacts
-                            if let Ok(contacts) = api_clone.get_contacts() {
-                                for contact in &contacts {
-                                    let _ = db_clone.save_contact(contact);
-                                }
-                                main_view.update_contacts(contacts);
-                            }
+                            // Transition to main view - events will populate contacts via WebSocket
+                            let main_view = Arc::new(MainView::new(
+                                Arc::clone(&db_clone),
+                                Arc::clone(&api_clone),
+                            ));
 
                             main_view.load_contacts();
+
+                            // Create a NEW WebSocket connection for the main view
+                            let (_ws_main, rx_main) = WebSocketClient::new("ws://localhost:8787");
+                            let main_view_clone = Arc::clone(&main_view);
+                            let db_clone_ws = Arc::clone(&db_clone);
+
+                            glib::timeout_add_local(
+                                std::time::Duration::from_millis(100),
+                                move || {
+                                    while let Ok(event) = rx_main.try_recv() {
+                                        match event {
+                                            WhatsAppEvent::Chat(wa_chat) => {
+                                                println!(
+                                                    "💬 Received chat: {} ({})",
+                                                    wa_chat.name.as_ref().unwrap_or(&wa_chat.id),
+                                                    wa_chat.id
+                                                );
+
+                                                let contact = models::Contact {
+                                                    jid: wa_chat.id.clone(),
+                                                    name: wa_chat.name.unwrap_or_else(|| {
+                                                        wa_chat
+                                                            .id
+                                                            .split('@')
+                                                            .next()
+                                                            .unwrap_or(&wa_chat.id)
+                                                            .to_string()
+                                                    }),
+                                                    last_message: None,
+                                                    last_message_time: None,
+                                                    unread_count: wa_chat.unread_count.unwrap_or(0),
+                                                    conversation_timestamp: wa_chat
+                                                        .conversation_timestamp
+                                                        .unwrap_or(0)
+                                                        as i64,
+                                                    is_group: wa_chat.id.contains("@g.us"),
+                                                    archived: wa_chat.archived.unwrap_or(false),
+                                                    pinned: wa_chat.pinned.unwrap_or(0),
+                                                    mute_end_time: wa_chat
+                                                        .mute_end_time
+                                                        .unwrap_or(0),
+                                                    profile_picture_url: None,
+                                                };
+
+                                                if let Err(e) = db_clone_ws.save_contact(&contact) {
+                                                    eprintln!(
+                                                        "❌ Failed to save chat {}: {}",
+                                                        contact.jid, e
+                                                    );
+                                                } else {
+                                                    println!("✅ Saved chat: {}", contact.name);
+                                                    if let Ok(contacts) = db_clone_ws.get_contacts()
+                                                    {
+                                                        main_view_clone.update_contacts(contacts);
+                                                    }
+                                                }
+                                            }
+                                            WhatsAppEvent::Contact(wa_contact) => {
+                                                println!(
+                                                    "👥 Received contact: {} ({})",
+                                                    wa_contact
+                                                        .name
+                                                        .as_ref()
+                                                        .unwrap_or(&wa_contact.id),
+                                                    wa_contact.id
+                                                );
+
+                                                let contact = models::Contact {
+                                                    jid: wa_contact.id.clone(),
+                                                    name: wa_contact
+                                                        .name
+                                                        .or(wa_contact.notify)
+                                                        .unwrap_or_else(|| {
+                                                            wa_contact
+                                                                .id
+                                                                .split('@')
+                                                                .next()
+                                                                .unwrap_or(&wa_contact.id)
+                                                                .to_string()
+                                                        }),
+                                                    last_message: None,
+                                                    last_message_time: None,
+                                                    unread_count: 0,
+                                                    conversation_timestamp: 0,
+                                                    is_group: wa_contact.id.contains("@g.us"),
+                                                    archived: false,
+                                                    pinned: 0,
+                                                    mute_end_time: 0,
+                                                    profile_picture_url: None,
+                                                };
+
+                                                if let Err(e) = db_clone_ws.save_contact(&contact) {
+                                                    eprintln!("❌ Failed to save contact: {}", e);
+                                                } else {
+                                                    println!("✅ Saved contact: {}", contact.name);
+                                                }
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                    glib::Continue(true)
+                                },
+                            );
+
                             window_clone.set_content(Some(&main_view.widget));
                         }
                         _ => {}
