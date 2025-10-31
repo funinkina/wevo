@@ -36,14 +36,31 @@ impl Database {
         conn.execute(
             "CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                message_id TEXT NOT NULL UNIQUE,
                 jid TEXT NOT NULL,
                 sender TEXT NOT NULL,
                 content TEXT NOT NULL,
                 timestamp INTEGER NOT NULL,
-                is_from_me BOOLEAN NOT NULL
+                is_from_me BOOLEAN NOT NULL,
+                message_type TEXT NOT NULL DEFAULT 'text',
+                raw_data TEXT,
+                quoted_message_id TEXT,
+                media_url TEXT,
+                caption TEXT
             )",
             [],
         )?;
+
+        // Migrate old messages table if needed
+        let _ = conn.execute("ALTER TABLE messages ADD COLUMN message_id TEXT", []);
+        let _ = conn.execute(
+            "ALTER TABLE messages ADD COLUMN message_type TEXT DEFAULT 'text'",
+            [],
+        );
+        let _ = conn.execute("ALTER TABLE messages ADD COLUMN raw_data TEXT", []);
+        let _ = conn.execute("ALTER TABLE messages ADD COLUMN quoted_message_id TEXT", []);
+        let _ = conn.execute("ALTER TABLE messages ADD COLUMN media_url TEXT", []);
+        let _ = conn.execute("ALTER TABLE messages ADD COLUMN caption TEXT", []);
 
         conn.execute(
             "CREATE TABLE IF NOT EXISTS session (
@@ -118,17 +135,28 @@ impl Database {
 
     pub fn save_message(&self, message: &Message) -> Result<()> {
         let conn = self.conn.lock().unwrap();
+        println!(
+            "[DB] Saving message: {} in chat {} (type: {})",
+            message.message_id, message.jid, message.message_type
+        );
         conn.execute(
-            "INSERT INTO messages (jid, sender, content, timestamp, is_from_me)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT OR REPLACE INTO messages (message_id, jid, sender, content, timestamp, is_from_me, message_type, raw_data, quoted_message_id, media_url, caption)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
+                message.message_id,
                 message.jid,
                 message.sender,
                 message.content,
                 message.timestamp,
-                message.is_from_me
+                message.is_from_me,
+                message.message_type,
+                message.raw_data,
+                message.quoted_message_id,
+                message.media_url,
+                message.caption,
             ],
         )?;
+        println!("[DB] Message saved successfully");
         Ok(())
     }
 
@@ -136,7 +164,7 @@ impl Database {
         let conn = self.conn.lock().unwrap();
         println!("[DB] Querying messages for JID: {}", jid);
         let mut stmt = conn.prepare(
-            "SELECT id, jid, sender, content, timestamp, is_from_me 
+            "SELECT id, message_id, jid, sender, content, timestamp, is_from_me, message_type, raw_data, quoted_message_id, media_url, caption
              FROM messages 
              WHERE jid = ?1 
              ORDER BY timestamp ASC",
@@ -146,11 +174,17 @@ impl Database {
             .query_map(params![jid], |row| {
                 Ok(Message {
                     id: row.get(0)?,
-                    jid: row.get(1)?,
-                    sender: row.get(2)?,
-                    content: row.get(3)?,
-                    timestamp: row.get(4)?,
-                    is_from_me: row.get(5)?,
+                    message_id: row.get(1)?,
+                    jid: row.get(2)?,
+                    sender: row.get(3)?,
+                    content: row.get(4)?,
+                    timestamp: row.get(5)?,
+                    is_from_me: row.get(6)?,
+                    message_type: row.get(7)?,
+                    raw_data: row.get(8)?,
+                    quoted_message_id: row.get(9)?,
+                    media_url: row.get(10)?,
+                    caption: row.get(11)?,
                 })
             })?
             .collect::<Result<Vec<_>>>()?;

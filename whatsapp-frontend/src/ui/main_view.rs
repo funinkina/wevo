@@ -307,11 +307,17 @@ impl MainView {
         // Save to DB
         let message = crate::models::Message {
             id: None,
+            message_id: format!("{}_{}", timestamp, sender), // Generate ID from timestamp+sender
             jid: jid.to_string(),
             sender: sender.to_string(),
             content: content.to_string(),
             timestamp,
             is_from_me,
+            message_type: "text".to_string(),
+            raw_data: None,
+            quoted_message_id: None,
+            media_url: None,
+            caption: None,
         };
         let _ = self.db.save_message(&message);
 

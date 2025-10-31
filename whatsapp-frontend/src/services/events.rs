@@ -1,11 +1,12 @@
 use serde::Deserialize;
+use serde_json::Value;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct WAMessage {
     pub key: WAKey,
     #[serde(rename = "messageTimestamp")]
     pub timestamp: i64,
-    pub message: Option<MessageContent>,
+    pub message: Option<Value>, // Changed to Value to capture all message data
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -18,6 +19,7 @@ pub struct WAKey {
     pub participant: Option<String>,
 }
 
+// Keep these for backward compatibility
 #[derive(Debug, Deserialize, Clone)]
 pub struct MessageContent {
     pub conversation: Option<String>,

@@ -66,7 +66,169 @@ fn main() {
                         match event {
                             WhatsAppEvent::Message(msg) => {
                                 println!("[main.rs] Received message event for: {}", msg.key.jid);
-                                // TODO: Save message to database and update UI
+
+                                // Extract message content and type
+                                let (content, message_type, quoted_id, media_url, caption) =
+                                    if let Some(ref msg_data) = msg.message {
+                                        let mut content = String::new();
+                                        let mut msg_type = "unknown".to_string();
+                                        let mut quoted_id = None;
+                                        let mut media_url = None;
+                                        let mut caption = None;
+
+                                        // Handle text messages
+                                        if let Some(text) =
+                                            msg_data.get("conversation").and_then(|v| v.as_str())
+                                        {
+                                            content = text.to_string();
+                                            msg_type = "text".to_string();
+                                        }
+                                        // Handle extended text (with formatting, links, etc.)
+                                        else if let Some(ext_text) =
+                                            msg_data.get("extendedTextMessage")
+                                        {
+                                            if let Some(text) =
+                                                ext_text.get("text").and_then(|v| v.as_str())
+                                            {
+                                                content = text.to_string();
+                                                msg_type = "text".to_string();
+                                            }
+                                            // Check for quoted message
+                                            if let Some(context) = ext_text.get("contextInfo") {
+                                                if let Some(stanza_id) =
+                                                    context.get("stanzaId").and_then(|v| v.as_str())
+                                                {
+                                                    quoted_id = Some(stanza_id.to_string());
+                                                }
+                                            }
+                                        }
+                                        // Handle reactions
+                                        else if let Some(reaction) =
+                                            msg_data.get("reactionMessage")
+                                        {
+                                            if let Some(text) =
+                                                reaction.get("text").and_then(|v| v.as_str())
+                                            {
+                                                content = format!("Reacted with {}", text);
+                                                msg_type = "reaction".to_string();
+                                            }
+                                            if let Some(key) = reaction.get("key") {
+                                                if let Some(msg_id) =
+                                                    key.get("id").and_then(|v| v.as_str())
+                                                {
+                                                    quoted_id = Some(msg_id.to_string());
+                                                }
+                                            }
+                                        }
+                                        // Handle image messages
+                                        else if let Some(image) = msg_data.get("imageMessage") {
+                                            msg_type = "image".to_string();
+                                            content = "[Image]".to_string();
+                                            if let Some(url) =
+                                                image.get("url").and_then(|v| v.as_str())
+                                            {
+                                                media_url = Some(url.to_string());
+                                            }
+                                            if let Some(cap) =
+                                                image.get("caption").and_then(|v| v.as_str())
+                                            {
+                                                caption = Some(cap.to_string());
+                                                content = format!("[Image] {}", cap);
+                                            }
+                                        }
+                                        // Handle video messages
+                                        else if let Some(video) = msg_data.get("videoMessage") {
+                                            msg_type = "video".to_string();
+                                            content = "[Video]".to_string();
+                                            if let Some(url) =
+                                                video.get("url").and_then(|v| v.as_str())
+                                            {
+                                                media_url = Some(url.to_string());
+                                            }
+                                            if let Some(cap) =
+                                                video.get("caption").and_then(|v| v.as_str())
+                                            {
+                                                caption = Some(cap.to_string());
+                                                content = format!("[Video] {}", cap);
+                                            }
+                                        }
+                                        // Handle audio messages
+                                        else if msg_data.get("audioMessage").is_some() {
+                                            msg_type = "audio".to_string();
+                                            content = "[Audio]".to_string();
+                                        }
+                                        // Handle document messages
+                                        else if let Some(doc) = msg_data.get("documentMessage") {
+                                            msg_type = "document".to_string();
+                                            if let Some(filename) =
+                                                doc.get("fileName").and_then(|v| v.as_str())
+                                            {
+                                                content = format!("[Document: {}]", filename);
+                                            } else {
+                                                content = "[Document]".to_string();
+                                            }
+                                        }
+                                        // Handle stickers
+                                        else if msg_data.get("stickerMessage").is_some() {
+                                            msg_type = "sticker".to_string();
+                                            content = "[Sticker]".to_string();
+                                        }
+
+                                        (content, msg_type, quoted_id, media_url, caption)
+                                    } else {
+                                        (
+                                            "[Empty message]".to_string(),
+                                            "unknown".to_string(),
+                                            None,
+                                            None,
+                                            None,
+                                        )
+                                    };
+
+                                // Determine sender
+                                let sender = if msg.key.from_me {
+                                    "me".to_string()
+                                } else {
+                                    msg.key
+                                        .participant
+                                        .as_ref()
+                                        .unwrap_or(&msg.key.jid)
+                                        .split('@')
+                                        .next()
+                                        .unwrap_or("Unknown")
+                                        .to_string()
+                                };
+
+                                // Convert to Message model
+                                let message = models::Message {
+                                    id: None,
+                                    message_id: msg.key.id.clone(),
+                                    jid: msg.key.jid.clone(),
+                                    sender,
+                                    content,
+                                    timestamp: msg.timestamp,
+                                    is_from_me: msg.key.from_me,
+                                    message_type,
+                                    raw_data: Some(
+                                        serde_json::to_string(&msg.message).unwrap_or_default(),
+                                    ),
+                                    quoted_message_id: quoted_id,
+                                    media_url,
+                                    caption,
+                                };
+
+                                // Save to database
+                                if let Err(e) = db_clone.save_message(&message) {
+                                    eprintln!(
+                                        "Failed to save message {}: {}",
+                                        message.message_id, e
+                                    );
+                                } else {
+                                    println!(
+                                        "✅ Saved message: {} in chat {}",
+                                        message.message_id, message.jid
+                                    );
+                                }
                             }
                             WhatsAppEvent::Contact(wa_contact) => {
                                 println!(

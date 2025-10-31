@@ -101,11 +101,17 @@ impl ApiClient {
             .filter_map(|m| {
                 Some(crate::models::Message {
                     id: None,
+                    message_id: m["message_id"].as_str()?.to_string(),
                     jid: m["jid"].as_str()?.to_string(),
                     sender: m["sender"].as_str()?.to_string(),
                     content: m["content"].as_str()?.to_string(),
                     timestamp: m["timestamp"].as_i64()?,
                     is_from_me: m["is_from_me"].as_bool()?,
+                    message_type: m["message_type"].as_str().unwrap_or("text").to_string(),
+                    raw_data: m["raw_data"].as_str().map(|s| s.to_string()),
+                    quoted_message_id: m["quoted_message_id"].as_str().map(|s| s.to_string()),
+                    media_url: m["media_url"].as_str().map(|s| s.to_string()),
+                    caption: m["caption"].as_str().map(|s| s.to_string()),
                 })
             })
             .collect())
