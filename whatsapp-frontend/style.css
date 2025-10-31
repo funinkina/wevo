@@ -41,15 +41,5 @@
 
 .navigation-sidebar row {
     border: none;
-    border-radius: 0;
     padding: 0;
-}
-
-.navigation-sidebar row:hover {
-    background: alpha(@accent_bg_color, 0.1);
-}
-
-.navigation-sidebar row:selected,
-.navigation-sidebar row:selected:hover {
-    background: alpha(@accent_bg_color, 0.15);
 }
