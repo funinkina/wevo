@@ -65,15 +65,12 @@ fn main() {
                     while let Ok(event) = rx.try_recv() {
                         match event {
                             WhatsAppEvent::Message(msg) => {
-                                println!(
-                                    "📨 [main.rs] Received message event for: {}",
-                                    msg.key.jid
-                                );
+                                println!("[main.rs] Received message event for: {}", msg.key.jid);
                                 // TODO: Save message to database and update UI
                             }
                             WhatsAppEvent::Contact(wa_contact) => {
                                 println!(
-                                    "👥 [main.rs] Received Contact: {} ({})",
+                                    "[main.rs] Received Contact: {} ({})",
                                     wa_contact.name.as_ref().unwrap_or(&wa_contact.id),
                                     wa_contact.id
                                 );
@@ -106,12 +103,12 @@ fn main() {
                                 if let Err(e) = db_clone.save_contact(&contact) {
                                     eprintln!("Failed to save contact {}: {}", contact.jid, e);
                                 } else {
-                                    println!("✅ Saved contact: {}", contact.name);
+                                    println!("Saved contact: {}", contact.name);
                                 }
                             }
                             WhatsAppEvent::Chat(wa_chat) => {
                                 println!(
-                                    "💬 [main.rs] Received Chat: {} ({})",
+                                    "[main.rs] Received Chat: {} ({})",
                                     wa_chat.name.as_ref().unwrap_or(&wa_chat.id),
                                     wa_chat.id
                                 );
@@ -145,7 +142,7 @@ fn main() {
                                 if let Err(e) = db_clone.save_contact(&contact) {
                                     eprintln!("Failed to save chat {}: {}", contact.jid, e);
                                 } else {
-                                    println!("✅ Saved chat: {}", contact.name);
+                                    println!("Saved chat: {}", contact.name);
 
                                     // Update UI with the new/updated contact
                                     if let Ok(contacts) = db_clone.get_contacts() {
@@ -187,7 +184,7 @@ fn main() {
             // Request QR code from backend
             let api_clone_qr = Arc::clone(&api);
             std::thread::spawn(move || {
-                println!("📱 Requesting QR code from backend...");
+                println!("Requesting QR code from backend...");
                 if let Err(e) = api_clone_qr.request_qr() {
                     eprintln!("Failed to request QR code: {}", e);
                 }
@@ -208,7 +205,7 @@ fn main() {
                             qr_view_clone.show_qr(&qr);
                         }
                         WhatsAppEvent::Connected => {
-                            println!("✅ Connected to WhatsApp!");
+                            println!("Connected to WhatsApp!");
                             qr_view_clone.show_connecting();
 
                             // Mark as authenticated
@@ -234,7 +231,7 @@ fn main() {
                                         match event {
                                             WhatsAppEvent::Chat(wa_chat) => {
                                                 println!(
-                                                    "💬 Received chat: {} ({})",
+                                                    "Received chat: {} ({})",
                                                     wa_chat.name.as_ref().unwrap_or(&wa_chat.id),
                                                     wa_chat.id
                                                 );
@@ -267,11 +264,11 @@ fn main() {
 
                                                 if let Err(e) = db_clone_ws.save_contact(&contact) {
                                                     eprintln!(
-                                                        "❌ Failed to save chat {}: {}",
+                                                        "Failed to save chat {}: {}",
                                                         contact.jid, e
                                                     );
                                                 } else {
-                                                    println!("✅ Saved chat: {}", contact.name);
+                                                    println!("Saved chat: {}", contact.name);
                                                     if let Ok(contacts) = db_clone_ws.get_contacts()
                                                     {
                                                         main_view_clone.update_contacts(contacts);
@@ -280,7 +277,7 @@ fn main() {
                                             }
                                             WhatsAppEvent::Contact(wa_contact) => {
                                                 println!(
-                                                    "👥 Received contact: {} ({})",
+                                                    "Received contact: {} ({})",
                                                     wa_contact
                                                         .name
                                                         .as_ref()
@@ -313,9 +310,9 @@ fn main() {
                                                 };
 
                                                 if let Err(e) = db_clone_ws.save_contact(&contact) {
-                                                    eprintln!("❌ Failed to save contact: {}", e);
+                                                    eprintln!("Failed to save contact: {}", e);
                                                 } else {
-                                                    println!("✅ Saved contact: {}", contact.name);
+                                                    println!("Saved contact: {}", contact.name);
                                                 }
                                             }
                                             _ => {}

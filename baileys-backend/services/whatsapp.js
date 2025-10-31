@@ -138,6 +138,9 @@ class WhatsAppService {
 
             for (const event of eventsToForward) {
                 this.sock.ev.on(event, (payload) => {
+                    // Log when event is received from Baileys
+                    console.log(`\n📥 Received event from Baileys: ${event}`)
+
                     if (this.eventCallback) {
                         this.eventCallback(event, payload)
                     }

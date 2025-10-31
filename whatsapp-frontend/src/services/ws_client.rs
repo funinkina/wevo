@@ -123,7 +123,7 @@ impl WebSocketClient {
                 if let Ok(data) = serde_json::from_value::<events::EventPayload>(payload.clone()) {
                     if let events::EventPayload::MessagingHistorySet(history) = data {
                         println!(
-                            "📚 Received messaging history: {} chats, {} contacts, {} messages",
+                            "Received messaging history: {} chats, {} contacts, {} messages",
                             history.chats.len(),
                             history.contacts.len(),
                             history.messages.len()

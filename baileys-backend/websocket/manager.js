@@ -31,6 +31,10 @@ class WebSocketManager {
     }
 
     sendEvent(type, payload) {
+        // Log the event payload before broadcasting
+        console.log(`\n📤 Sending event to frontend: ${type}`)
+        console.log('Payload:', JSON.stringify(payload, null, 2))
+
         this.broadcast({ type, payload })
     }
 }
