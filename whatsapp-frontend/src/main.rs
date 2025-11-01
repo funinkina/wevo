@@ -5,17 +5,104 @@ mod ui;
 use adw::prelude::*;
 use gtk4::prelude::*;
 use libadwaita as adw;
+use std::path::PathBuf;
+use std::process::{Child, Command};
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use models::Database;
 use services::ws_client::WhatsAppEvent;
 use services::{ApiClient, WebSocketClient};
 use ui::{MainView, QrView};
 
+// Global backend process handle
+static BACKEND_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
+
+fn get_backend_path() -> PathBuf {
+    // Get the executable path
+    let exe_path = std::env::current_exe().expect("Failed to get executable path");
+    let exe_dir = exe_path
+        .parent()
+        .expect("Failed to get executable directory");
+
+    // Check if we're in development (target/debug or target/release)
+    if exe_dir.ends_with("debug") || exe_dir.ends_with("release") {
+        // Development mode - go up from whatsapp-frontend/target/debug to project root
+        exe_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+            .expect("Failed to find project root")
+            .join("baileys-backend")
+    } else {
+        // Production mode - backend should be next to the binary
+        exe_dir.join("baileys-backend")
+    }
+}
+
+fn start_backend() -> Result<Child, std::io::Error> {
+    let backend_path = get_backend_path();
+    println!("Starting backend from: {}", backend_path.display());
+
+    // Check if node_modules exists, if not install dependencies
+    let node_modules = backend_path.join("node_modules");
+    if !node_modules.exists() {
+        println!("Installing backend dependencies...");
+        let install_status = Command::new("npm")
+            .arg("install")
+            .current_dir(&backend_path)
+            .status()?;
+
+        if !install_status.success() {
+            eprintln!("Failed to install backend dependencies");
+        }
+    }
+
+    // Start the Node.js server
+    let child = Command::new("node")
+        .arg("server.js")
+        .current_dir(&backend_path)
+        .spawn()?;
+
+    println!("Backend started with PID: {}", child.id());
+
+    // Wait a moment for the server to start
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
+    Ok(child)
+}
+
+fn stop_backend() {
+    let mut process = BACKEND_PROCESS.lock().unwrap();
+    if let Some(mut child) = process.take() {
+        println!("Stopping backend process...");
+        let _ = child.kill();
+        let _ = child.wait();
+        println!("Backend stopped");
+    }
+}
+
 fn main() {
+    // Start the backend server
+    match start_backend() {
+        Ok(child) => {
+            *BACKEND_PROCESS.lock().unwrap() = Some(child);
+        }
+        Err(e) => {
+            eprintln!("Failed to start backend: {}", e);
+            std::process::exit(1);
+        }
+    }
+
     let app = adw::Application::builder()
         .application_id("org.aryan.whatsappgtk")
         .build();
+
+    // Setup cleanup on shutdown
+    app.connect_shutdown(|_| {
+        println!("Application shutting down...");
+        stop_backend();
+    });
 
     app.connect_activate(|app| {
         // Load CSS
